@@ -5,9 +5,10 @@
 #include <sys/types.h>
 #include <unistd.h> 
 
-// the followings are for shared memory ----
+// the followings are for shared memory / message queue----
 #include <sys/ipc.h>
 #include <sys/shm.h> 
+#include <sys/msg.h>
 
 using namespace std;
 
@@ -25,6 +26,7 @@ using namespace std;
 // function prototypes
 unsigned int uniform_rand(void);  // a random number generator
 void millisleep(unsigned ms);     // for random sleep time
+
 
 int main(void) {
     pid_t  process_id;
@@ -44,6 +46,8 @@ int main(void) {
         int      parent;
         int      child;  
     };
+
+
 
     return 0;
 }
