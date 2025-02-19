@@ -35,6 +35,8 @@ int create_shared_mem();
 struct my_mem* attach_shared_mem(int mem_id);
 int delete_shared_mem(int mem_id);
 
+int create_child_processes(struct my_mem * p_shm, int mem_id);
+
 
 // definition of message -------------------------------------------
 struct message{
@@ -68,7 +70,7 @@ int main(void) {
     shm_id = create_shared_mem();
     p_shm = attach_shared_mem(shm_id);
 
-
+    int child_status = create_child_processes(p_shm, shm_id);
 
     int msg_delete_status = delete_msg_queue(msgid);
     int mem_delete_status = delete_shared_mem(shm_id);
@@ -175,3 +177,87 @@ int delete_shared_mem(int mem_id)
     return 0; // Indicate success
 }
 
+int create_child_processes(struct my_mem * p_shm, int mem_id) 
+{
+    for (int i = 0; i < NUM_CHILD; i++) {
+        // spawn a child process ----
+        int process_id = fork();
+
+        // The child process ----------------------------- //
+        if (process_id == 0)
+        {
+            printf("I am the child process ...\n");
+
+            // initialize child process ----    
+            p_shm->child = 1; // child started .. 
+        
+            // wait for the parent to get ready ----
+            int k = 0;
+            while (p_shm->parent != 1)     
+            { k = k + 1; }
+ 
+            for (int i = 0; i < NUM_REPEATS; i++)  
+            { 
+                // subtract 1 from the shared memory ----
+                p_shm->counter = p_shm->counter - 1;  
+                printf("subtracter: %d\n", p_shm->counter);   
+            }
+
+            // declare the completion ----
+            p_shm->child = 0;  
+            cout << "child process completed." << endl;
+
+            // detach the shared memory ----
+            int ret_val = shmdt(p_shm);  
+            if (ret_val != 0)
+            {  printf("detaching the shared memory failed (C) ...\n"); }
+ 
+            exit(0); 
+        }
+
+        // The parent process ----------------------------- //   
+        else 
+        {     
+            printf("I am the parent process ...\n");  
+
+            // initialize the parent process ----
+            p_shm->parent = 1;  // the parent process started ..
+
+            // wait for the child pocess to get ready ----
+            int k = 0;
+            while (p_shm->child != 1)
+            {  k = k + 1; }
+            //int k = 0;   
+        
+            for (int i = 0; i < NUM_REPEATS; i++)   
+            { 
+                // THE CRITICAL SECTION ============= // 
+                p_shm->counter = p_shm->counter + 1;  
+                printf("adder: %d\n", p_shm->counter);
+            }
+
+            // declare completion ----
+            p_shm->parent = 0;  
+            cout << "Parent process completed." << endl;
+
+            // wait for the child process to complete ---- 
+            k = 0;
+            while (p_shm->child != 0)  
+            {  k = k + 1;  }   
+
+            printf("Shared Memory Counter: %d\n", p_shm->counter);  
+
+            // detach the shared memory ---
+            int ret_val = shmdt(p_shm);  
+            if (ret_val != 0) 
+            {  printf ("shared memory detach failed (P) ....\n"); }
+
+            ret_val = shmctl(mem_id, IPC_RMID, 0);  
+            if (ret_val == -1)
+            {  printf("shm remove ID failed ... \n"); }
+ 
+            exit(0);  
+        }
+        return 0;
+    }
+}
