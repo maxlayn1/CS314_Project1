@@ -26,7 +26,23 @@ using namespace std;
 // function prototypes
 unsigned int uniform_rand(void);  // a random number generator
 void millisleep(unsigned ms);     // for random sleep time
+int msg_queue();
+int msg_send(int msgid, int msg_number);
+int delete_msg_queue(int msgid);
 
+
+// definition of message -------------------------------------------
+struct message{
+    long mtype;
+    int mnum;
+};
+
+// shared memory definition ---------------------------------------
+struct my_mem {
+    long int counter;
+    int      parent;
+    int      child;  
+};
 
 int main(void) {
     pid_t  process_id;
@@ -40,14 +56,13 @@ int main(void) {
     int    shm_size;              // the size of the shared memoy  
     struct my_mem * p_shm;        // pointer to the attached shared memory 
 
-    // shared memory definition ----   
-    struct my_mem {
-        long int counter;
-        int      parent;
-        int      child;  
-    };
+
+    int msg_number = uniform_rand();
+    int msgid = create_msg_queue();
+    int msg_sent = msg_send(msgid, msg_number);
 
 
+    int msg_delete_status;
 
     return 0;
 }
@@ -65,9 +80,40 @@ void millisleep(unsigned milli_seconds)
     usleep(milli_seconds * 1000); 
 }
 
-// definition of message -------------------------------------------
-struct message{
-    long mtype;
-    int mnum;
-};
+int create_msg_queue() 
+{
+    int msgid = msgget(SHM_KEY, IPC_CREAT | 0666);
+    if (msgid == -1) {
+        perror("msgget");
+        return EXIT_FAILURE;
+    }
+    //cout << "Message queue ID: " << msgid << endl;
+
+    return msgid;
+}
+
+int msg_send(int msgid, int msg_number) 
+{
+    struct message msg;
+    msg.mtype = 1;
+    msg.mnum = msg_number;
+
+    int send_result = msgsnd(msgid, &msg, sizeof(msg.mnum), 0);
+    if (send_result == -1) {
+        perror("msgsnd");
+        return EXIT_FAILURE;
+    }
+
+    return send_result;
+}
+
+int delete_msg_queue(int msgid) 
+{
+    if (msgctl(msgid, IPC_RMID, nullptr) == -1) {
+        perror("msgctl (delete)");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
 
