@@ -26,9 +26,14 @@ using namespace std;
 // function prototypes
 unsigned int uniform_rand(void);  // a random number generator
 void millisleep(unsigned ms);     // for random sleep time
-int msg_queue();
+
+int create_msg_queue();
 int msg_send(int msgid, int msg_number);
 int delete_msg_queue(int msgid);
+
+int create_shared_mem();
+struct my_mem* attach_shared_mem(int mem_id);
+int delete_shared_mem(int mem_id);
 
 
 // definition of message -------------------------------------------
@@ -56,13 +61,17 @@ int main(void) {
     int    shm_size;              // the size of the shared memoy  
     struct my_mem * p_shm;        // pointer to the attached shared memory 
 
-
     int msg_number = uniform_rand();
     int msgid = create_msg_queue();
     int msg_sent = msg_send(msgid, msg_number);
 
+    shm_id = create_shared_mem();
+    p_shm = attach_shared_mem(shm_id);
 
-    int msg_delete_status;
+
+
+    int msg_delete_status = delete_msg_queue(msgid);
+    int mem_delete_status = delete_shared_mem(shm_id);
 
     return 0;
 }
@@ -114,6 +123,55 @@ int delete_msg_queue(int msgid)
         return EXIT_FAILURE;
     }
 
+    cout << "Message queue successfully deleted." << endl;
     return EXIT_SUCCESS;
+}
+
+int create_shared_mem() 
+{
+    // find the shared memory size in bytes ----
+    int shm_size = sizeof(my_mem);   
+    if (shm_size <= 0)
+    {  
+        fprintf(stderr, "sizeof error in acquiring the shared memory size. Terminating ..\n");
+        exit(0); 
+    }
+
+    // create a shared memory ----
+   int shm_id = shmget(SHM_KEY, shm_size, IPC_CREAT | 0666);         
+   if (shm_id < 0) 
+   {
+      fprintf(stderr, "Failed to create the shared memory. Terminating ..\n");  
+      exit(0);  
+   } 
+   return shm_id;
+}
+
+struct my_mem* attach_shared_mem(int mem_id) 
+{
+   // attach the new shared memory ----
+   struct my_mem *p_shm = (struct my_mem *)shmat(mem_id, NULL, 0);     
+   if (p_shm == (struct my_mem*) -1)
+   {
+      fprintf(stderr, "Failed to attach the shared memory.  Terminating ..\n"); 
+      exit(0);   
+   }   
+
+   // initialize the shared memory ----
+   p_shm->counter  = 0;  
+   p_shm->parent   = 0;   
+   p_shm->child    = 0;
+
+   return p_shm;
+}
+
+int delete_shared_mem(int mem_id) 
+{
+    if (shmctl(mem_id, IPC_RMID, nullptr) == -1) {
+        perror("shmctl (delete)");
+        return -1; // Indicate error
+    }
+    cout << "Shared memory deleted successfully." << endl;
+    return 0; // Indicate success
 }
 
