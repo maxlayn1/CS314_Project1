@@ -35,7 +35,7 @@ int create_shared_mem();
 struct my_mem *attach_shared_mem(int mem_id);
 int delete_shared_mem(int mem_id);
 
-int create_child_processes(struct my_mem *p_shm, int mem_id);
+int create_child_processes(struct my_mem *p_shm, int msqid);
 
 void process_C1(struct my_mem *p_shm, int msqid); // consumer 1
 void process_C2(struct my_mem *p_shm, int msqid); // consumer 2
@@ -191,7 +191,7 @@ int delete_shared_mem(int mem_id)
     return 0; // Indicate success
 }
 
-int create_child_processes(struct my_mem *p_shm, int mem_id)
+int create_child_processes(struct my_mem *p_shm, int msqid)
 {
     for (int i = 0; i < NUM_CHILD; i++)
     {
@@ -210,7 +210,6 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
             {
                 k = k + 1;
             }
-            // cout << "child loop one" << endl;
 
             cout << "child " << child_index << " completed" << endl;
             p_shm->Done_Flag[child_index] = 1;
@@ -233,13 +232,12 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
     {
         k = k + 1;
     }
-    // cout << "parent loop one" << endl;
 
     p_shm->Go_Flag = 1; // all 4 children created
     cout << "GO flag" << endl;
 
     while (true)
-    { // Spin wait till all children complete
+    { // spin wait till all children complete
         bool all_done = true;
         for (int i = 0; i < NUM_CHILD; i++)
         {
@@ -251,7 +249,7 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
         }
         if (all_done)
         {
-            break; // exit loop when all are done
+            break; // exit loop when all children are done
         }
     }
 
@@ -304,8 +302,8 @@ void process_C2(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
-    printf("    Child Process #1 is created ....\n");
-    printf("    I am the first consumer ....\n\n");
+    printf("    Child Process #2 is created ....\n");
+    printf("    I am the second consumer ....\n\n");
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -315,7 +313,7 @@ void process_C2(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #2 -------------------------------------------
     // NOTE: after the following output, C1 can not make any output
-    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+    printf("    Child Process #2 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
     p_shm->Done_Flag[0] = checksum; // I m done!
@@ -331,8 +329,8 @@ void process_C3(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
-    printf("    Child Process #1 is created ....\n");
-    printf("    I am the first consumer ....\n\n");
+    printf("    Child Process #3 is created ....\n");
+    printf("    I am the first producer ....\n\n");
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -342,7 +340,7 @@ void process_C3(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #2 -------------------------------------------
     // NOTE: after the following output, C1 can not make any output
-    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+    printf("    Child Process #3 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
     p_shm->Done_Flag[0] = checksum; // I m done!
@@ -358,8 +356,8 @@ void process_C4(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
-    printf("    Child Process #1 is created ....\n");
-    printf("    I am the first consumer ....\n\n");
+    printf("    Child Process #4 is created ....\n");
+    printf("    I am the second producer ....\n\n");
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -369,7 +367,7 @@ void process_C4(struct my_mem *p_shm, int msqid)
 
     // REQUIRED output #2 -------------------------------------------
     // NOTE: after the following output, C1 can not make any output
-    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+    printf("    Child Process #4 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
     p_shm->Done_Flag[0] = checksum; // I m done!
