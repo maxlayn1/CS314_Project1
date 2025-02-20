@@ -33,6 +33,7 @@ int delete_msg_queue(int msgid);
 
 int create_shared_mem();
 struct my_mem *attach_shared_mem(int shm_id);
+int detach_shared_mem(struct my_mem *p_shm);
 int delete_shared_mem(int shm_id);
 
 int create_child_processes(struct my_mem *p_shm, int msgid);
@@ -61,10 +62,7 @@ struct my_mem
 
 int main(void)
 {
-    pid_t process_id;
-    int i;     // external loop counter
-    int j;     // internal loop counter
-    int k = 0; // dummy integer
+    // pid_t process_id;
 
     int ret_val;          // system-call return value
     int sem_id;           //
@@ -180,6 +178,17 @@ struct my_mem *attach_shared_mem(int shm_id)
     return p_shm;
 }
 
+int detach_shared_mem(struct my_mem *p_shm)
+{
+    // detach the shared memory ----
+    int ret_val = shmdt(p_shm);
+    if (ret_val != 0)
+    {
+        return -1; // Indicate error
+    }
+    return 0; // Indicate success
+}
+
 int delete_shared_mem(int shm_id)
 {
     if (shmctl(shm_id, IPC_RMID, nullptr) == -1)
@@ -195,46 +204,39 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
 {
     for (int i = 0; i < NUM_CHILD; i++)
     {
-
         int process_id = fork();
 
-        // The child process ----------------------------- //
         if (process_id == 0)
         {
-            int child_index = i;
-            cout << "child process created" << endl;
-            p_shm->Child_Count = p_shm->Child_Count + 1;
-
-            int k = 0; // spin wait until parent says READY
-            while (p_shm->Go_Flag == 0)
+            // Child process
+            switch (i)
             {
-                k = k + 1;
+            case 0:
+                process_C1(p_shm, msgid);
+                break;
+            case 1:
+                process_C2(p_shm, msgid);
+                break;
+            case 2:
+                process_C3(p_shm, msgid);
+                break;
+            case 3:
+                process_C4(p_shm, msgid);
+                break;
+            default:
+                break;
             }
-
-            cout << "child " << child_index << " completed" << endl;
-            p_shm->Done_Flag[child_index] = 1;
-
-            // detach the shared memory ----
-            int ret_val = shmdt(p_shm);
-            if (ret_val != 0)
-            {
-                printf("detaching the shared memory failed (C) ...\n");
-            }
-
-            exit(0);
         }
     }
-    // The parent process ----------------------------- //
-    cout << "parent process created" << endl;
 
-    int k = 0; // spin wait until 4 child processes created
+    // The parent process ----------------------------- //
+    int k = 0; // spin wait until all child processes created
     while (p_shm->Child_Count < NUM_CHILD)
     {
         k = k + 1;
     }
 
-    p_shm->Go_Flag = 1; // all 4 children created
-    cout << "GO flag" << endl;
+    p_shm->Go_Flag = 1; // all children created, parent says GO
 
     while (true)
     { // spin wait till all children complete
@@ -256,16 +258,15 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
     cout << "parent process completed" << endl;
 
     // detach the shared memory ---
-    int ret_val = shmdt(p_shm);
+    int ret_val = detach_shared_mem(p_shm);
     if (ret_val != 0)
     {
         printf("shared memory detach failed (P) ....\n");
     }
-
     return 0;
 }
 
-// Process C1 =============================================================
+// Process C1 (consumer 1) =============================================================
 void process_C1(struct my_mem *p_shm, int msgid)
 {
     int i;                        // the loop counter
@@ -298,21 +299,37 @@ void process_C1(struct my_mem *p_shm, int msgid)
     printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
-    p_shm->Done_Flag[0] = checksum; // I m done!
+    p_shm->Done_Flag[child_index] = 1; // I m done!
+
+    int ret_val = detach_shared_mem(p_shm); // detach the shared memory
+    if (ret_val != 0)
+    {
+        printf("shared memory detach failed (C1) ....\n");
+    }
+    exit(0); // terminate the process
 }
 
-// Process C2 =============================================================
+// Process C2 (consumer 2) =============================================================
 void process_C2(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
     unsigned int my_rand;  // a randon number
     unsigned int checksum; // the local checksum
+    unsigned int child_index = 1; // child's index in the Done_Flag array
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
     printf("    Child Process #2 is created ....\n");
     printf("    I am the second consumer ....\n\n");
+
+    p_shm->Child_Count = p_shm->Child_Count + 1;
+
+    int k = 0; // spin wait until parent says READY
+    while (p_shm->Go_Flag == 0)
+    {
+        k = k + 1;
+    }
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -325,21 +342,37 @@ void process_C2(struct my_mem *p_shm, int msgid)
     printf("    Child Process #2 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
-    p_shm->Done_Flag[0] = checksum; // I m done!
+    p_shm->Done_Flag[child_index] = 1; // I m done!
+
+    int ret_val = detach_shared_mem(p_shm); // detach the shared memory
+    if (ret_val != 0)
+    {
+        printf("shared memory detach failed (C2) ....\n");
+    }
+    exit(0);                               // terminate the process
 }
 
-// Process C3 =============================================================
+// Process C3 (producer 1) =============================================================
 void process_C3(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
     unsigned int my_rand;  // a randon number
     unsigned int checksum; // the local checksum
+    unsigned int child_index = 2; // child's index in the Done_Flag array
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
     printf("    Child Process #3 is created ....\n");
     printf("    I am the first producer ....\n\n");
+
+    p_shm->Child_Count = p_shm->Child_Count + 1;
+
+    int k = 0; // spin wait until parent says READY
+    while (p_shm->Go_Flag == 0)
+    {
+        k = k + 1;
+    }
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -352,21 +385,37 @@ void process_C3(struct my_mem *p_shm, int msgid)
     printf("    Child Process #3 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
-    p_shm->Done_Flag[0] = checksum; // I m done!
+    p_shm->Done_Flag[child_index] = 1; // I m done!
+
+    int ret_val = detach_shared_mem(p_shm); // detach the shared memory
+    if (ret_val != 0)
+    {
+        printf("shared memory detach failed (C3) ....\n");
+    }
+    exit(0);                               // terminate the process
 }
 
-// Process C4 =============================================================
+// Process C4 (producer 2) =============================================================
 void process_C4(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
     unsigned int my_rand;  // a randon number
     unsigned int checksum; // the local checksum
+    unsigned int child_index = 3; // child's index in the Done_Flag array
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
     printf("    Child Process #4 is created ....\n");
     printf("    I am the second producer ....\n\n");
+
+    p_shm->Child_Count = p_shm->Child_Count + 1;
+
+    int k = 0; // spin wait until parent says READY
+    while (p_shm->Go_Flag == 0)
+    {
+        k = k + 1;
+    }
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -379,7 +428,14 @@ void process_C4(struct my_mem *p_shm, int msgid)
     printf("    Child Process #4 is terminating (checksum: %d) ....\n\n", checksum);
 
     // raise my "Done_Flag" -----------------------------------------
-    p_shm->Done_Flag[0] = checksum; // I m done!
+    p_shm->Done_Flag[child_index] = 1; // I m done!
+
+    int ret_val = detach_shared_mem(p_shm); // detach the shared memory
+    if (ret_val != 0)
+    {
+        printf("shared memory detach failed (C4) ....\n");
+    }
+    exit(0);                               // terminate the process
 }
 
 /*
