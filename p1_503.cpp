@@ -12,8 +12,8 @@
 
 using namespace std;
 
-#define SHM_KEY 7295 // the shared memory key (i think this is mine idk)
-#define MSG_KEY 7299 // (unique) message queue key (will need to make sure)
+#define SHM_KEY 7295
+#define MSG_KEY 7299
 
 #define NUM_REPEATS 200 // number of loops for high-priority processes
 #define NUM_CHILD 4     // number of the child processes
@@ -32,15 +32,15 @@ int msg_send(int msgid, int msg_number);
 int delete_msg_queue(int msgid);
 
 int create_shared_mem();
-struct my_mem *attach_shared_mem(int mem_id);
-int delete_shared_mem(int mem_id);
+struct my_mem *attach_shared_mem(int shm_id);
+int delete_shared_mem(int shm_id);
 
-int create_child_processes(struct my_mem *p_shm, int msqid);
+int create_child_processes(struct my_mem *p_shm, int msgid);
 
-void process_C1(struct my_mem *p_shm, int msqid); // consumer 1
-void process_C2(struct my_mem *p_shm, int msqid); // consumer 2
-void process_C3(struct my_mem *p_shm, int msqid); // producer 1
-void process_C4(struct my_mem *p_shm, int msqid); // producer 2
+void process_C1(struct my_mem *p_shm, int msgid); // consumer 1
+void process_C2(struct my_mem *p_shm, int msgid); // consumer 2
+void process_C3(struct my_mem *p_shm, int msgid); // producer 1
+void process_C4(struct my_mem *p_shm, int msgid); // producer 2
 
 // definition of message -------------------------------------------
 struct message
@@ -158,10 +158,10 @@ int create_shared_mem()
     return shm_id;
 }
 
-struct my_mem *attach_shared_mem(int mem_id)
+struct my_mem *attach_shared_mem(int shm_id)
 {
     // attach the new shared memory ----
-    struct my_mem *p_shm = (struct my_mem *)shmat(mem_id, NULL, 0);
+    struct my_mem *p_shm = (struct my_mem *)shmat(shm_id, NULL, 0);
     if (p_shm == (struct my_mem *)-1)
     {
         fprintf(stderr, "Failed to attach the shared memory.  Terminating ..\n");
@@ -180,9 +180,9 @@ struct my_mem *attach_shared_mem(int mem_id)
     return p_shm;
 }
 
-int delete_shared_mem(int mem_id)
+int delete_shared_mem(int shm_id)
 {
-    if (shmctl(mem_id, IPC_RMID, nullptr) == -1)
+    if (shmctl(shm_id, IPC_RMID, nullptr) == -1)
     {
         perror("shmctl (delete)");
         return -1; // Indicate error
@@ -191,7 +191,7 @@ int delete_shared_mem(int mem_id)
     return 0; // Indicate success
 }
 
-int create_child_processes(struct my_mem *p_shm, int msqid)
+int create_child_processes(struct my_mem *p_shm, int msgid)
 {
     for (int i = 0; i < NUM_CHILD; i++)
     {
@@ -266,17 +266,26 @@ int create_child_processes(struct my_mem *p_shm, int msqid)
 }
 
 // Process C1 =============================================================
-void process_C1(struct my_mem *p_shm, int msqid)
+void process_C1(struct my_mem *p_shm, int msgid)
 {
-    int i;                 // the loop counter
-    int status;            // result status code
-    unsigned int my_rand;  // a randon number
-    unsigned int checksum; // the local checksum
+    int i;                        // the loop counter
+    int status;                   // result status code
+    unsigned int my_rand;         // a randon number
+    unsigned int checksum;        // the local checksum
+    unsigned int child_index = 0; // child's index in the Done_Flag array
 
     // REQUIRED output #1 -------------------------------------------
     // NOTE: C1 can not make any output before this output
     printf("    Child Process #1 is created ....\n");
     printf("    I am the first consumer ....\n\n");
+
+    p_shm->Child_Count = p_shm->Child_Count + 1;
+
+    int k = 0; // spin wait until parent says READY
+    while (p_shm->Go_Flag == 0)
+    {
+        k = k + 1;
+    }
 
     // REQUIRED: shuffle the seed for random generator --------------
     srand(time(0));
@@ -293,7 +302,7 @@ void process_C1(struct my_mem *p_shm, int msqid)
 }
 
 // Process C2 =============================================================
-void process_C2(struct my_mem *p_shm, int msqid)
+void process_C2(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
@@ -320,7 +329,7 @@ void process_C2(struct my_mem *p_shm, int msqid)
 }
 
 // Process C3 =============================================================
-void process_C3(struct my_mem *p_shm, int msqid)
+void process_C3(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
@@ -347,7 +356,7 @@ void process_C3(struct my_mem *p_shm, int msqid)
 }
 
 // Process C4 =============================================================
-void process_C4(struct my_mem *p_shm, int msqid)
+void process_C4(struct my_mem *p_shm, int msgid)
 {
     int i;                 // the loop counter
     int status;            // result status code
@@ -374,7 +383,7 @@ void process_C4(struct my_mem *p_shm, int msqid)
 }
 
 /*
-    int     msqid_01;      // message queue ID (#1)
+    int     msgid_01;      // message queue ID (#1)
    key_t  msgkey_01;      // message-queue key (#1)
 
 
@@ -384,6 +393,6 @@ void process_C4(struct my_mem *p_shm, int msqid)
    msgkey_01 = MSG_KEY;     // the messge-que ID key
 
    // create a new message queue -----------------------------------
-   msqid_01 = msgget(msgkey_01, 0666 | IPC_CREAT);
+   msgid_01 = msgget(msgkey_01, 0666 | IPC_CREAT);
 
    have to create the message queue and then delete processes/queue */
