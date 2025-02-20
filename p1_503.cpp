@@ -20,8 +20,8 @@ using namespace std;
 
 #define BUFFER_SIZE       1024    // max. message queue size
 
-#define ONE_SECOND     1000000    //    1 second
-#define THREE_SECONDS  3000000    //    3 seconds
+#define ONE_SECOND        1000    //    1 second
+#define THREE_SECONDS     3000    //    3 seconds
 
 // function prototypes
 unsigned int uniform_rand(void);  // a random number generator
@@ -45,10 +45,12 @@ struct message{
 };
 
 // shared memory definition ---------------------------------------
-struct my_mem {
-    long int counter;
-    int      parent;
-    int      child;  
+struct my_mem { 
+    unsigned int Go_Flag;
+    unsigned int Done_Flag[4];
+    int Individual_Sum[4];
+
+    unsigned int Child_Count; //idk to keep yet or not
 };
 
 int main(void) {
@@ -71,6 +73,10 @@ int main(void) {
     p_shm = attach_shared_mem(shm_id);
 
     int child_status = create_child_processes(p_shm, shm_id);
+    
+    if (child_status == 0) {
+        cout << "child process function finished without error" << endl;
+    }
 
     int msg_delete_status = delete_msg_queue(msgid);
     int mem_delete_status = delete_shared_mem(shm_id);
@@ -125,7 +131,7 @@ int delete_msg_queue(int msgid)
         return EXIT_FAILURE;
     }
 
-    cout << "Message queue successfully deleted." << endl;
+    cout << "message queue successfully deleted" << endl;
     return EXIT_SUCCESS;
 }
 
@@ -160,9 +166,12 @@ struct my_mem* attach_shared_mem(int mem_id)
    }   
 
    // initialize the shared memory ----
-   p_shm->counter  = 0;  
-   p_shm->parent   = 0;   
-   p_shm->child    = 0;
+   p_shm->Go_Flag = 0;
+   p_shm->Child_Count = 0;
+   for (int i = 0; i < 4; i++) {
+    p_shm->Done_Flag[i] = 0;
+    p_shm->Individual_Sum[i] = 0;
+   }
 
    return p_shm;
 }
@@ -173,39 +182,31 @@ int delete_shared_mem(int mem_id)
         perror("shmctl (delete)");
         return -1; // Indicate error
     }
-    cout << "Shared memory deleted successfully." << endl;
+    cout << "shared memory deleted successfully" << endl;
     return 0; // Indicate success
 }
 
 int create_child_processes(struct my_mem * p_shm, int mem_id) 
 {
     for (int i = 0; i < NUM_CHILD; i++) {
-        // spawn a child process ----
-        int process_id = fork();
 
+        int process_id = fork();
+        
         // The child process ----------------------------- //
         if (process_id == 0)
-        {
-            printf("I am the child process ...\n");
-
-            // initialize child process ----    
-            p_shm->child = 1; // child started .. 
-        
-            // wait for the parent to get ready ----
-            int k = 0;
-            while (p_shm->parent != 1)     
-            { k = k + 1; }
- 
-            for (int i = 0; i < NUM_REPEATS; i++)  
-            { 
-                // subtract 1 from the shared memory ----
-                p_shm->counter = p_shm->counter - 1;  
-                printf("subtracter: %d\n", p_shm->counter);   
+        { 
+            int child_index = i;
+            cout << "child process created" << endl;
+            p_shm->Child_Count = p_shm->Child_Count + 1;
+            
+            int k = 0; //spin wait until parent says READY
+            while (p_shm->Go_Flag == 0) {
+                k = k + 1;
             }
+            cout << "child loop one" << endl;
 
-            // declare the completion ----
-            p_shm->child = 0;  
-            cout << "child process completed." << endl;
+            cout << "child " << child_index << " completed" << endl;
+            p_shm->Done_Flag[child_index] = 1;
 
             // detach the shared memory ----
             int ret_val = shmdt(p_shm);  
@@ -214,50 +215,38 @@ int create_child_processes(struct my_mem * p_shm, int mem_id)
  
             exit(0); 
         }
-
+    }
         // The parent process ----------------------------- //   
-        else 
-        {     
-            printf("I am the parent process ...\n");  
+            cout << "parent process created" << endl;
+            
+            int k = 0; //spin wait until 4 child processes created
+            while (p_shm->Child_Count < NUM_CHILD) {
+                k = k + 1;
+            } 
+            cout << "parent loop one" << endl;
+            
+            p_shm->Go_Flag = 1; //all 4 children created
+            cout << "GO flag" << endl;
 
-            // initialize the parent process ----
-            p_shm->parent = 1;  // the parent process started ..
-
-            // wait for the child pocess to get ready ----
-            int k = 0;
-            while (p_shm->child != 1)
-            {  k = k + 1; }
-            //int k = 0;   
-        
-            for (int i = 0; i < NUM_REPEATS; i++)   
-            { 
-                // THE CRITICAL SECTION ============= // 
-                p_shm->counter = p_shm->counter + 1;  
-                printf("adder: %d\n", p_shm->counter);
+            while (true) { // Spin wait till all children complete
+                bool all_done = true;
+                for (int i = 0; i < NUM_CHILD; i++) {
+                    if (p_shm->Done_Flag[i] != 1) {
+                        all_done = false;
+                        break; //at least one child not done
+                    }
+                }
+                if (all_done) {
+                    break; //exit loop when all are done
+                }
             }
 
-            // declare completion ----
-            p_shm->parent = 0;  
-            cout << "Parent process completed." << endl;
-
-            // wait for the child process to complete ---- 
-            k = 0;
-            while (p_shm->child != 0)  
-            {  k = k + 1;  }   
-
-            printf("Shared Memory Counter: %d\n", p_shm->counter);  
+            cout << "parent process completed" << endl;
 
             // detach the shared memory ---
             int ret_val = shmdt(p_shm);  
             if (ret_val != 0) 
             {  printf ("shared memory detach failed (P) ....\n"); }
 
-            ret_val = shmctl(mem_id, IPC_RMID, 0);  
-            if (ret_val == -1)
-            {  printf("shm remove ID failed ... \n"); }
- 
-            exit(0);  
-        }
         return 0;
-    }
 }
