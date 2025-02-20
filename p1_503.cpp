@@ -37,6 +37,11 @@ int delete_shared_mem(int mem_id);
 
 int create_child_processes(struct my_mem *p_shm, int mem_id);
 
+void process_C1(struct my_mem *p_shm, int msqid); // consumer 1
+void process_C2(struct my_mem *p_shm, int msqid); // consumer 2
+void process_C3(struct my_mem *p_shm, int msqid); // producer 1
+void process_C4(struct my_mem *p_shm, int msqid); // producer 2
+
 // definition of message -------------------------------------------
 struct message
 {
@@ -75,11 +80,6 @@ int main(void)
     p_shm = attach_shared_mem(shm_id);
 
     int child_status = create_child_processes(p_shm, shm_id);
-
-    if (child_status == 0)
-    {
-        cout << "child process function finished without error" << endl;
-    }
 
     int msg_delete_status = delete_msg_queue(msgid);
     int mem_delete_status = delete_shared_mem(shm_id);
@@ -210,7 +210,7 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
             {
                 k = k + 1;
             }
-            cout << "child loop one" << endl;
+            // cout << "child loop one" << endl;
 
             cout << "child " << child_index << " completed" << endl;
             p_shm->Done_Flag[child_index] = 1;
@@ -233,7 +233,7 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
     {
         k = k + 1;
     }
-    cout << "parent loop one" << endl;
+    // cout << "parent loop one" << endl;
 
     p_shm->Go_Flag = 1; // all 4 children created
     cout << "GO flag" << endl;
@@ -267,6 +267,114 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
     return 0;
 }
 
+// Process C1 =============================================================
+void process_C1(struct my_mem *p_shm, int msqid)
+{
+    int i;                 // the loop counter
+    int status;            // result status code
+    unsigned int my_rand;  // a randon number
+    unsigned int checksum; // the local checksum
+
+    // REQUIRED output #1 -------------------------------------------
+    // NOTE: C1 can not make any output before this output
+    printf("    Child Process #1 is created ....\n");
+    printf("    I am the first consumer ....\n\n");
+
+    // REQUIRED: shuffle the seed for random generator --------------
+    srand(time(0));
+
+    // REQUIRED 3 second wait ---------------------------------------
+    millisleep(THREE_SECONDS);
+
+    // REQUIRED output #2 -------------------------------------------
+    // NOTE: after the following output, C1 can not make any output
+    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+
+    // raise my "Done_Flag" -----------------------------------------
+    p_shm->Done_Flag[0] = checksum; // I m done!
+}
+
+// Process C2 =============================================================
+void process_C2(struct my_mem *p_shm, int msqid)
+{
+    int i;                 // the loop counter
+    int status;            // result status code
+    unsigned int my_rand;  // a randon number
+    unsigned int checksum; // the local checksum
+
+    // REQUIRED output #1 -------------------------------------------
+    // NOTE: C1 can not make any output before this output
+    printf("    Child Process #1 is created ....\n");
+    printf("    I am the first consumer ....\n\n");
+
+    // REQUIRED: shuffle the seed for random generator --------------
+    srand(time(0));
+
+    // REQUIRED 3 second wait ---------------------------------------
+    millisleep(THREE_SECONDS);
+
+    // REQUIRED output #2 -------------------------------------------
+    // NOTE: after the following output, C1 can not make any output
+    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+
+    // raise my "Done_Flag" -----------------------------------------
+    p_shm->Done_Flag[0] = checksum; // I m done!
+}
+
+// Process C3 =============================================================
+void process_C3(struct my_mem *p_shm, int msqid)
+{
+    int i;                 // the loop counter
+    int status;            // result status code
+    unsigned int my_rand;  // a randon number
+    unsigned int checksum; // the local checksum
+
+    // REQUIRED output #1 -------------------------------------------
+    // NOTE: C1 can not make any output before this output
+    printf("    Child Process #1 is created ....\n");
+    printf("    I am the first consumer ....\n\n");
+
+    // REQUIRED: shuffle the seed for random generator --------------
+    srand(time(0));
+
+    // REQUIRED 3 second wait ---------------------------------------
+    millisleep(THREE_SECONDS);
+
+    // REQUIRED output #2 -------------------------------------------
+    // NOTE: after the following output, C1 can not make any output
+    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+
+    // raise my "Done_Flag" -----------------------------------------
+    p_shm->Done_Flag[0] = checksum; // I m done!
+}
+
+// Process C4 =============================================================
+void process_C4(struct my_mem *p_shm, int msqid)
+{
+    int i;                 // the loop counter
+    int status;            // result status code
+    unsigned int my_rand;  // a randon number
+    unsigned int checksum; // the local checksum
+
+    // REQUIRED output #1 -------------------------------------------
+    // NOTE: C1 can not make any output before this output
+    printf("    Child Process #1 is created ....\n");
+    printf("    I am the first consumer ....\n\n");
+
+    // REQUIRED: shuffle the seed for random generator --------------
+    srand(time(0));
+
+    // REQUIRED 3 second wait ---------------------------------------
+    millisleep(THREE_SECONDS);
+
+    // REQUIRED output #2 -------------------------------------------
+    // NOTE: after the following output, C1 can not make any output
+    printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
+
+    // raise my "Done_Flag" -----------------------------------------
+    p_shm->Done_Flag[0] = checksum; // I m done!
+}
+
 /*
     int     msqid_01;      // message queue ID (#1)
    key_t  msgkey_01;      // message-queue key (#1)
@@ -281,52 +389,3 @@ int create_child_processes(struct my_mem *p_shm, int mem_id)
    msqid_01 = msgget(msgkey_01, 0666 | IPC_CREAT);
 
    have to create the message queue and then delete processes/queue */
-
-/* child process structure ------------------------------------------------ *
- *                                                                          *
- *  Use this child-process structure (required).                            *
- *                                                                          *
- * ------------------------------------------------------------------------ */
-
-/*
-// function prototype ----------------------------------------------
-void process_C1(struct my_mem * p_shm, int msqid);  // Child #1
-
-
-
-
-Process C1 =============================================================
-void process_C1(struct my_mem * p_shm, int msqid)
-{
-  int          i;            // the loop counter
-  int          status;       // result status code
-  unsigned int my_rand;      // a randon number
-  unsigned int checksum;     // the local checksum
-
-  // REQUIRED output #1 -------------------------------------------
-  // NOTE: C1 can not make any output before this output
-  printf("    Child Process #1 is created ....\n");
-  printf("    I am the first consumer ....\n\n");
-
-  // REQUIRED: shuffle the seed for random generator --------------
-  srand(time(0));
-
-
-
-
-
-
-
-
-
-
-  // REQUIRED 3 second wait ---------------------------------------
-  millisleep (THREE_SECONDS);
-
-  // REQUIRED output #2 -------------------------------------------
-  // NOTE: after the following output, C1 can not make any output
-  printf("    Child Process #1 is terminating (checksum: %d) ....\n\n", checksum);
-
-  // raise my "Done_Flag" -----------------------------------------
-  p_shm->Done_FLAG[0] = checksum;  // I m done!
-}  */
