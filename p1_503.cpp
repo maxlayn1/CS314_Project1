@@ -108,8 +108,6 @@ int create_msg_queue()
         perror("msgget");
         return EXIT_FAILURE;
     }
-    // cout << "Message queue ID: " << msgid << endl;
-
     return msgid;
 }
 
@@ -125,7 +123,6 @@ int msg_send(int msgid, int msg_number)
         perror("msgsnd");
         return EXIT_FAILURE;
     }
-
     return send_result;
 }
 
