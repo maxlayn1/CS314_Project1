@@ -63,13 +63,11 @@ int main(void)
     int shm_size;         // the size of the shared memoy
     struct my_mem *p_shm; // pointer to the attached shared memory
 
-    
-    int msgid = create_msg_queue();
+    int msgid = create_msg_queue();    // create the message queue
+    shm_id = create_shared_mem();      // create the shared memory
+    p_shm = attach_shared_mem(shm_id); // attach the shared memory
 
-    shm_id = create_shared_mem();
-    p_shm = attach_shared_mem(shm_id);
-
-    int child_status = create_child_processes(p_shm, msgid);
+    int child_status = create_child_processes(p_shm, msgid); // create the child processes
 
     int msg_delete_status = delete_msg_queue(msgid);   // delete the message queue
     int mem_delete_status = delete_shared_mem(shm_id); // delete the shared memory
@@ -205,6 +203,8 @@ int delete_shared_mem(int shm_id)
 
 int create_child_processes(struct my_mem *p_shm, int msgid)
 {
+
+    printf("================ THE PARENT PROCESS STARTS ==================\n");
     for (int i = 0; i < NUM_CHILD; i++)
     {
         pid_t process_id = fork();
@@ -233,7 +233,8 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
     }
 
     // The parent process ----------------------------- //
-    int final_sum;
+    int send_checksum;
+    int recv_checksum;
 
     int k = 0; // spin wait until all child processes created
     while (p_shm->Child_Count < NUM_CHILD)
@@ -242,6 +243,7 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
     }
 
     p_shm->Go_Flag = 1; // all children created, parent says GO
+    printf("--------------- The parent process waits for children to terminate\n\n");
 
     while (true)
     { // spin wait till all children complete
@@ -260,8 +262,16 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
         }
     }
 
-    final_sum = p_shm->Individual_Sum[2] + p_shm->Individual_Sum[3];
-    printf("    The final sum is %d ....\n", final_sum);
+    send_checksum = p_shm->Individual_Sum[2] + p_shm->Individual_Sum[3];
+    recv_checksum = p_shm->Individual_Sum[0] + p_shm->Individual_Sum[1];
+    printf("PARENT PROCESS REPORT ************************************\n");
+    printf("    C1 checksum: %d\n", p_shm->Individual_Sum[0]);
+    printf("    C2 checksum: %d\n", p_shm->Individual_Sum[1]);
+    printf("    C3 checksum: %d\n", p_shm->Individual_Sum[2]);
+    printf("    C4 checksum: %d\n", p_shm->Individual_Sum[3]);
+    printf("    SEND-CHECKSUM: %d\n", send_checksum);
+    printf("    RECV-CHECKSUM: %d\n", recv_checksum);
+    printf("------------------------ the parent process is terminating ...\n");
 
     // detach the shared memory ---
     int ret_val = detach_shared_mem(p_shm);
