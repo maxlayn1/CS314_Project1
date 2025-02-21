@@ -1,16 +1,14 @@
 // Maxim Tikhonov mtikhon@siue.edu
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ctime>
 
 // the followings are for shared memory / message queue----
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
-
-using namespace std;
 
 #define SHM_KEY 7295
 #define MSG_KEY 7299
@@ -139,8 +137,6 @@ int delete_msg_queue(int msgid)
         perror("msgctl (delete)");
         return EXIT_FAILURE;
     }
-
-    cout << "message queue successfully deleted" << endl;
     return EXIT_SUCCESS;
 }
 
@@ -204,7 +200,6 @@ int delete_shared_mem(int shm_id)
         perror("shmctl (delete)");
         return -1; // Indicate error
     }
-    cout << "shared memory deleted successfully" << endl;
     return 0; // Indicate success
 }
 
@@ -266,7 +261,7 @@ int create_child_processes(struct my_mem *p_shm, int msgid)
     }
 
     final_sum = p_shm->Individual_Sum[2] + p_shm->Individual_Sum[3];
-    cout << "Final sum: " << final_sum << endl;
+    printf("    The final sum is %d ....\n", final_sum);
 
     // detach the shared memory ---
     int ret_val = detach_shared_mem(p_shm);
@@ -470,18 +465,3 @@ void process_C4(struct my_mem *p_shm, int msgid)
     }
     exit(0); // terminate the process
 }
-
-/*
-    int     msgid_01;      // message queue ID (#1)
-   key_t  msgkey_01;      // message-queue key (#1)
-
-
-   // instantiate the message buffer --------------------------------
-   struct message buf_01;   // for #1
-
-   msgkey_01 = MSG_KEY;     // the messge-que ID key
-
-   // create a new message queue -----------------------------------
-   msgid_01 = msgget(msgkey_01, 0666 | IPC_CREAT);
-
-   have to create the message queue and then delete processes/queue */
